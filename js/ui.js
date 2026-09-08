@@ -1,8 +1,5 @@
 /**
  * 画面上の操作部品を作成・管理するモジュール。
- *
- * CSSはStep 4で分離して整える予定なので、
- * 現段階では機能確認に必要な最小限のインライン指定だけを使う。
  */
 
 export function buildUI(root, initialState) {
@@ -11,74 +8,139 @@ export function buildUI(root, initialState) {
   }
 
   root.innerHTML = `
-    <h1>シャノン標本化シミュレータ</h1>
+    <header class="page-header">
+      <p class="eyebrow">Sampling theorem explorer</p>
+      <h1>シャノン標本化シミュレータ</h1>
+      <p class="lead">
+        元信号の周波数と標本化周波数を変えて、
+        標本点と復元波形の変化を観察してください。
+      </p>
+    </header>
 
-    <p>
-      元信号の周波数と標本化周波数を変えて、
-      標本点と復元波形の変化を観察してください。
-    </p>
+    <section class="control-panel" aria-label="シミュレータ設定">
+      <div class="control-grid">
+        <div class="control-block">
+          <div class="control-label-row">
+            <label for="signal-frequency">元信号周波数</label>
+            <output id="signal-frequency-value" for="signal-frequency"></output>
+          </div>
+          <input
+            id="signal-frequency"
+            type="range"
+            min="100"
+            max="1000"
+            step="10"
+          >
+          <div class="range-hints" aria-hidden="true">
+            <span>100 Hz</span>
+            <span>1000 Hz</span>
+          </div>
+        </div>
 
-    <section>
-      <div>
-        <label for="signal-frequency">
-          元信号周波数：
-          <strong><span id="signal-frequency-value"></span> Hz</strong>
-        </label>
-        <br>
-        <input
-          id="signal-frequency"
-          type="range"
-          min="100"
-          max="1000"
-          step="10"
-        >
+        <div class="control-block">
+          <div class="control-label-row">
+            <label for="sampling-frequency">標本化周波数</label>
+            <output id="sampling-frequency-value" for="sampling-frequency"></output>
+          </div>
+          <input
+            id="sampling-frequency"
+            type="range"
+            min="100"
+            max="4000"
+            step="10"
+          >
+          <div class="range-hints" aria-hidden="true">
+            <span>100 Hz</span>
+            <span>4000 Hz</span>
+          </div>
+        </div>
       </div>
 
-      <br>
+      <div class="audio-panel">
+        <div class="audio-heading">
+          <div>
+            <h2>音で比較</h2>
+            <p>音をオンにすると、元信号と復元信号を切り替えて聞けます。</p>
+          </div>
 
-      <div>
-        <label for="sampling-frequency">
-          標本化周波数：
-          <strong><span id="sampling-frequency-value"></span> Hz</strong>
-        </label>
-        <br>
-        <input
-          id="sampling-frequency"
-          type="range"
-          min="100"
-          max="4000"
-          step="10"
-        >
+          <label class="switch">
+            <input id="audio-enabled" type="checkbox">
+            <span class="switch-track" aria-hidden="true"></span>
+            <span class="switch-label">音</span>
+          </label>
+        </div>
+
+        <fieldset id="audio-mode-fieldset" class="segmented-control">
+          <legend class="visually-hidden">再生する音</legend>
+
+          <label>
+            <input
+              type="radio"
+              name="audio-mode"
+              value="source"
+              checked
+            >
+            <span>元信号</span>
+          </label>
+
+          <label>
+            <input
+              type="radio"
+              name="audio-mode"
+              value="reconstructed"
+            >
+            <span>復元信号</span>
+          </label>
+        </fieldset>
+
+        <p id="audio-note" class="audio-note"></p>
       </div>
 
-      <br>
-
-      <button id="reset-button" type="button">初期値に戻す</button>
+      <div class="panel-footer">
+        <button id="reset-button" class="reset-button" type="button">
+          初期値に戻す
+        </button>
+        <p id="status" class="status" role="status"></p>
+      </div>
     </section>
 
-    <hr>
+    <section class="graph-card">
+      <div class="graph-heading">
+        <div>
+          <p class="graph-number">01</p>
+          <h2>元信号と標本点</h2>
+        </div>
+        <p>連続した元信号から、どの点が取り出されているかを観察します。</p>
+      </div>
 
-    <section>
-      <h2>元信号と標本点</h2>
-      <canvas
-        id="sampling-canvas"
-        width="900"
-        height="280"
-        aria-label="元信号と標本点のグラフ"
-      ></canvas>
+      <div class="canvas-wrap">
+        <canvas
+          id="sampling-canvas"
+          width="900"
+          height="280"
+          aria-label="元信号と標本点のグラフ"
+        ></canvas>
+      </div>
     </section>
 
-    <section>
-      <h2>元信号と復元信号</h2>
-      <canvas
-        id="reconstruction-canvas"
-        width="900"
-        height="280"
-        aria-label="元信号と復元信号のグラフ"
-      ></canvas>
-    </section>
+    <section class="graph-card">
+      <div class="graph-heading">
+        <div>
+          <p class="graph-number">02</p>
+          <h2>元信号と復元信号</h2>
+        </div>
+        <p>標本値から理想的な sinc 補間で復元した波形を比較します。</p>
+      </div>
 
-    <p id="status" role="status"></p>
+      <div class="canvas-wrap">
+        <canvas
+          id="reconstruction-canvas"
+          width="900"
+          height="280"
+          aria-label="元信号と復元信号のグラフ"
+        ></canvas>
+      </div>
+    </section>
   `;
 
   const elements = {
@@ -86,26 +148,19 @@ export function buildUI(root, initialState) {
     signalFrequencyValue: root.querySelector("#signal-frequency-value"),
     samplingFrequency: root.querySelector("#sampling-frequency"),
     samplingFrequencyValue: root.querySelector("#sampling-frequency-value"),
+
+    audioEnabled: root.querySelector("#audio-enabled"),
+    audioModeFieldset: root.querySelector("#audio-mode-fieldset"),
+    audioModeInputs: [
+      ...root.querySelectorAll('input[name="audio-mode"]'),
+    ],
+    audioNote: root.querySelector("#audio-note"),
+
     resetButton: root.querySelector("#reset-button"),
     samplingCanvas: root.querySelector("#sampling-canvas"),
     reconstructionCanvas: root.querySelector("#reconstruction-canvas"),
     status: root.querySelector("#status"),
   };
-
-  // Step 4でCSSへ移す予定の、最低限の表示上の指定。
-  for (const canvas of [
-    elements.samplingCanvas,
-    elements.reconstructionCanvas,
-  ]) {
-    canvas.style.width = "100%";
-    canvas.style.maxWidth = "900px";
-    canvas.style.height = "280px";
-    canvas.style.border = "1px solid #ccc";
-    canvas.style.display = "block";
-  }
-
-  elements.signalFrequency.style.width = "min(700px, 90vw)";
-  elements.samplingFrequency.style.width = "min(700px, 90vw)";
 
   syncUI(elements, initialState);
 
@@ -117,6 +172,8 @@ export function bindUI(
   {
     onSignalFrequencyChange,
     onSamplingFrequencyChange,
+    onAudioEnabledChange,
+    onAudioModeChange,
     onReset,
   }
 ) {
@@ -128,6 +185,18 @@ export function bindUI(
     onSamplingFrequencyChange(Number(event.target.value));
   });
 
+  elements.audioEnabled.addEventListener("change", (event) => {
+    onAudioEnabledChange(event.target.checked);
+  });
+
+  for (const input of elements.audioModeInputs) {
+    input.addEventListener("change", (event) => {
+      if (event.target.checked) {
+        onAudioModeChange(event.target.value);
+      }
+    });
+  }
+
   elements.resetButton.addEventListener("click", () => {
     onReset();
   });
@@ -135,12 +204,30 @@ export function bindUI(
 
 export function syncUI(elements, currentState) {
   elements.signalFrequency.value = currentState.signalFrequency;
-  elements.signalFrequencyValue.textContent = currentState.signalFrequency;
+  elements.signalFrequencyValue.textContent =
+    `${currentState.signalFrequency} Hz`;
 
   elements.samplingFrequency.value = currentState.samplingFrequency;
-  elements.samplingFrequencyValue.textContent = currentState.samplingFrequency;
+  elements.samplingFrequencyValue.textContent =
+    `${currentState.samplingFrequency} Hz`;
+
+  elements.audioEnabled.checked = currentState.audioEnabled;
+
+  for (const input of elements.audioModeInputs) {
+    input.checked = input.value === currentState.audioMode;
+    input.disabled = !currentState.audioEnabled;
+  }
+
+  elements.audioModeFieldset.classList.toggle(
+    "is-disabled",
+    !currentState.audioEnabled
+  );
 }
 
 export function setStatus(elements, message) {
   elements.status.textContent = message;
+}
+
+export function setAudioNote(elements, message) {
+  elements.audioNote.textContent = message;
 }

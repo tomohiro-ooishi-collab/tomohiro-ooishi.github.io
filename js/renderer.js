@@ -1,16 +1,15 @@
 /**
  * Canvasへ波形を描画するモジュール。
- *
  * 計算は行わず、渡された波形データを描画することだけを担当する。
  */
 
 const COLORS = {
-  axis: "#666",
-  grid: "#e5e7eb",
+  axis: "#697386",
+  grid: "#e7ebf0",
   source: "#2563eb",
-  samples: "#dc2626",
-  reconstructed: "#f59e0b",
-  text: "#111827",
+  samples: "#e11d48",
+  reconstructed: "#d97706",
+  text: "#263244",
   background: "#ffffff",
 };
 
@@ -114,7 +113,7 @@ function prepareCanvas(canvas) {
   ctx.fillStyle = COLORS.background;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.font = "13px sans-serif";
+  ctx.font = "13px system-ui, sans-serif";
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
@@ -131,8 +130,6 @@ function drawBaseGraph(
   }
 ) {
   const plot = getPlotArea(canvas);
-
-  // 横方向の補助線
   const yTicks = [-1, -0.5, 0, 0.5, 1];
 
   for (const normalized of yTicks) {
@@ -151,14 +148,9 @@ function drawBaseGraph(
     ctx.fillStyle = COLORS.text;
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
-    ctx.fillText(
-      value.toFixed(1),
-      plot.left - 8,
-      y
-    );
+    ctx.fillText(value.toFixed(1), plot.left - 8, y);
   }
 
-  // 時間軸
   const tickCount = 5;
 
   for (let i = 0; i <= tickCount; i++) {
@@ -252,7 +244,6 @@ function drawSamples(
     const y = mapY(samples.values[i], plot, yLimit);
     const zeroY = mapY(0, plot, yLimit);
 
-    // 標本時刻を見やすくするためのステム
     ctx.beginPath();
     ctx.strokeStyle = COLORS.samples;
     ctx.lineWidth = 1;

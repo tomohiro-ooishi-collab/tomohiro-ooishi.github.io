@@ -22,6 +22,7 @@ import {
   bindUI,
   syncUI,
   setStatus,
+  setAudioNote,
 } from "./ui.js";
 
 import {
@@ -29,22 +30,14 @@ import {
   renderReconstruction,
 } from "./renderer.js";
 
-/**
- * シミュレータ全体の司令塔。
- *
- * 状態
- *   ↓
- * 元信号生成
- *   ↓
- * 標本化
- *   ↓
- * sinc復元
- *   ↓
- * 描画
- */
+import {
+  createAudioController,
+  calculateAudioInfo,
+} from "./audio.js";
 
 const root = document.querySelector("#app");
 const ui = buildUI(root, state);
+const audio = createAudioController();
 
 bindUI(ui, {
   onSignalFrequencyChange(value) {
@@ -52,9 +45,7 @@ bindUI(ui, {
       signalFrequency: value,
     });
 
-    ui.signalFrequencyValue.textContent =
-      value;
-
+    syncUI(ui, state);
     scheduleUpdate();
   },
 
@@ -63,21 +54,62 @@ bindUI(ui, {
       samplingFrequency: value,
     });
 
-    ui.samplingFrequencyValue.textContent =
-      value;
-
+    syncUI(ui, state);
     scheduleUpdate();
   },
 
+  async onAudioEnabledChange(enabled) {
+    try {
+      updateState({
+        audioEnabled: enabled,
+      });
+
+      syncUI(ui, state);
+
+      const info = await audio.setEnabled(
+        enabled,
+        getAudioParameters()
+      );
+
+      setAudioNote(ui, info.note);
+    } catch (error) {
+      console.error(error);
+
+      updateState({
+        audioEnabled: false,
+      });
+
+      syncUI(ui, state);
+      setAudioNote(
+        ui,
+        `音声を開始できませんでした: ${error.message}`
+      );
+    }
+  },
+
+  onAudioModeChange(mode) {
+    updateState({
+      audioMode: mode,
+    });
+
+    syncUI(ui, state);
+
+    const info = audio.setMode(
+      mode,
+      getAudioParameters()
+    );
+
+    setAudioNote(ui, info.note);
+  },
+
   onReset() {
+    audio.stop();
     resetState();
     syncUI(ui, state);
     scheduleUpdate();
   },
 });
 
-// スライダーを連続して動かしても、
-// 1フレームに何度も重いsinc計算をしないようにする。
 let updateScheduled = false;
 
 function scheduleUpdate() {
@@ -110,8 +142,6 @@ function updateSimulation() {
       }
     );
 
-    // sinc補間は本来無限個の標本を用いる。
-    // 表示区間の前後にも標本を作り、有限和による端部誤差を抑える。
     const samples = sampleSignal(
       signal,
       {
@@ -168,17 +198,32 @@ function updateSimulation() {
       }
     );
 
+    const audioInfo = audio.update(
+      getAudioParameters()
+    );
+
+    setAudioNote(ui, audioInfo.note);
+
     setStatus(
       ui,
       `元信号 ${state.signalFrequency} Hz ／ 標本化周波数 ${state.samplingFrequency} Hz`
     );
   } catch (error) {
     console.error(error);
+
     setStatus(
       ui,
       `エラー: ${error.message}`
     );
   }
+}
+
+function getAudioParameters() {
+  return {
+    signalFrequency: state.signalFrequency,
+    samplingFrequency: state.samplingFrequency,
+    phase: state.phase,
+  };
 }
 
 function filterSamples(
@@ -202,7 +247,18 @@ function filterSamples(
 }
 
 console.log(
-  "Shannon sampling simulator interactive version loaded."
+  "Shannon sampling simulator finished version loaded."
+);
+
+const initialAudioInfo =
+  calculateAudioInfo(
+    getAudioParameters(),
+    state.audioMode
+  );
+
+setAudioNote(
+  ui,
+  initialAudioInfo.note
 );
 
 updateSimulation();
