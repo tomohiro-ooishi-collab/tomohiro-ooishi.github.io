@@ -56,46 +56,6 @@ export function buildUI(root, initialState) {
         </div>
       </div>
 
-      <div class="audio-panel">
-        <div class="audio-heading">
-          <div>
-            <h2>音で比較</h2>
-            <p>音をオンにすると、元信号と復元信号を切り替えて聞けます。</p>
-          </div>
-
-          <label class="switch">
-            <input id="audio-enabled" type="checkbox">
-            <span class="switch-track" aria-hidden="true"></span>
-            <span class="switch-label">音</span>
-          </label>
-        </div>
-
-        <fieldset id="audio-mode-fieldset" class="segmented-control">
-          <legend class="visually-hidden">再生する音</legend>
-
-          <label>
-            <input
-              type="radio"
-              name="audio-mode"
-              value="source"
-              checked
-            >
-            <span>元信号</span>
-          </label>
-
-          <label>
-            <input
-              type="radio"
-              name="audio-mode"
-              value="reconstructed"
-            >
-            <span>復元信号</span>
-          </label>
-        </fieldset>
-
-        <p id="audio-note" class="audio-note"></p>
-      </div>
-
       <div class="panel-footer">
         <button id="reset-button" class="reset-button" type="button">
           初期値に戻す
@@ -140,6 +100,28 @@ export function buildUI(root, initialState) {
           aria-label="元信号と復元信号のグラフ"
         ></canvas>
       </div>
+
+      <div class="audio-actions" aria-label="音声比較">
+        <div class="audio-buttons">
+          <button
+            id="play-source-button"
+            class="audio-button source-audio-button"
+            type="button"
+          >
+            原音を聞く
+          </button>
+
+          <button
+            id="play-reconstructed-button"
+            class="audio-button reconstructed-audio-button"
+            type="button"
+          >
+            復元音を聞く
+          </button>
+        </div>
+
+        <p id="audio-note" class="audio-note"></p>
+      </div>
     </section>
   `;
 
@@ -149,16 +131,14 @@ export function buildUI(root, initialState) {
     samplingFrequency: root.querySelector("#sampling-frequency"),
     samplingFrequencyValue: root.querySelector("#sampling-frequency-value"),
 
-    audioEnabled: root.querySelector("#audio-enabled"),
-    audioModeFieldset: root.querySelector("#audio-mode-fieldset"),
-    audioModeInputs: [
-      ...root.querySelectorAll('input[name="audio-mode"]'),
-    ],
-    audioNote: root.querySelector("#audio-note"),
-
     resetButton: root.querySelector("#reset-button"),
     samplingCanvas: root.querySelector("#sampling-canvas"),
     reconstructionCanvas: root.querySelector("#reconstruction-canvas"),
+
+    playSourceButton: root.querySelector("#play-source-button"),
+    playReconstructedButton: root.querySelector("#play-reconstructed-button"),
+    audioNote: root.querySelector("#audio-note"),
+
     status: root.querySelector("#status"),
   };
 
@@ -172,8 +152,8 @@ export function bindUI(
   {
     onSignalFrequencyChange,
     onSamplingFrequencyChange,
-    onAudioEnabledChange,
-    onAudioModeChange,
+    onPlaySource,
+    onPlayReconstructed,
     onReset,
   }
 ) {
@@ -185,17 +165,13 @@ export function bindUI(
     onSamplingFrequencyChange(Number(event.target.value));
   });
 
-  elements.audioEnabled.addEventListener("change", (event) => {
-    onAudioEnabledChange(event.target.checked);
+  elements.playSourceButton.addEventListener("click", () => {
+    onPlaySource();
   });
 
-  for (const input of elements.audioModeInputs) {
-    input.addEventListener("change", (event) => {
-      if (event.target.checked) {
-        onAudioModeChange(event.target.value);
-      }
-    });
-  }
+  elements.playReconstructedButton.addEventListener("click", () => {
+    onPlayReconstructed();
+  });
 
   elements.resetButton.addEventListener("click", () => {
     onReset();
@@ -210,18 +186,6 @@ export function syncUI(elements, currentState) {
   elements.samplingFrequency.value = currentState.samplingFrequency;
   elements.samplingFrequencyValue.textContent =
     `${currentState.samplingFrequency} Hz`;
-
-  elements.audioEnabled.checked = currentState.audioEnabled;
-
-  for (const input of elements.audioModeInputs) {
-    input.checked = input.value === currentState.audioMode;
-    input.disabled = !currentState.audioEnabled;
-  }
-
-  elements.audioModeFieldset.classList.toggle(
-    "is-disabled",
-    !currentState.audioEnabled
-  );
 }
 
 export function setStatus(elements, message) {

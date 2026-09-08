@@ -41,6 +41,8 @@ const audio = createAudioController();
 
 bindUI(ui, {
   onSignalFrequencyChange(value) {
+    audio.stop();
+
     updateState({
       signalFrequency: value,
     });
@@ -50,6 +52,8 @@ bindUI(ui, {
   },
 
   onSamplingFrequencyChange(value) {
+    audio.stop();
+
     updateState({
       samplingFrequency: value,
     });
@@ -58,48 +62,38 @@ bindUI(ui, {
     scheduleUpdate();
   },
 
-  async onAudioEnabledChange(enabled) {
+  async onPlaySource() {
     try {
-      updateState({
-        audioEnabled: enabled,
-      });
-
-      syncUI(ui, state);
-
-      const info = await audio.setEnabled(
-        enabled,
+      const info = await audio.play(
+        "source",
         getAudioParameters()
       );
 
       setAudioNote(ui, info.note);
     } catch (error) {
       console.error(error);
-
-      updateState({
-        audioEnabled: false,
-      });
-
-      syncUI(ui, state);
       setAudioNote(
         ui,
-        `音声を開始できませんでした: ${error.message}`
+        `音声を再生できませんでした: ${error.message}`
       );
     }
   },
 
-  onAudioModeChange(mode) {
-    updateState({
-      audioMode: mode,
-    });
+  async onPlayReconstructed() {
+    try {
+      const info = await audio.play(
+        "reconstructed",
+        getAudioParameters()
+      );
 
-    syncUI(ui, state);
-
-    const info = audio.setMode(
-      mode,
-      getAudioParameters()
-    );
-
-    setAudioNote(ui, info.note);
+      setAudioNote(ui, info.note);
+    } catch (error) {
+      console.error(error);
+      setAudioNote(
+        ui,
+        `音声を再生できませんでした: ${error.message}`
+      );
+    }
   },
 
   onReset() {
@@ -198,8 +192,9 @@ function updateSimulation() {
       }
     );
 
-    const audioInfo = audio.update(
-      getAudioParameters()
+    const audioInfo = calculateAudioInfo(
+      getAudioParameters(),
+      "source"
     );
 
     setAudioNote(ui, audioInfo.note);
@@ -247,18 +242,7 @@ function filterSamples(
 }
 
 console.log(
-  "Shannon sampling simulator finished version loaded."
-);
-
-const initialAudioInfo =
-  calculateAudioInfo(
-    getAudioParameters(),
-    state.audioMode
-  );
-
-setAudioNote(
-  ui,
-  initialAudioInfo.note
+  "Shannon sampling simulator audio-button version loaded."
 );
 
 updateSimulation();

@@ -1,153 +1,134 @@
 /**
  * 音声再生を扱うモジュール。
  *
- * 現在の信号モデルは単一正弦波なので、
- * 元信号はその周波数、復元信号は標本列から得られる
- * エイリアス周波数として再生する。
- *
- * 低すぎる音を聞きやすくする場合は「加算オフセット」ではなく、
- * 元音と復元音の両方に同じ 2^n 倍のオクターブ補正をかける。
- * これにより両者の周波数比を保つ。
+ * 原音・復元音はボタンを押したときだけ、一定時間鳴らす。
+ * 比較を壊さないため、低音補正は加算オフセットではなく
+ * 両方に共通する 2^n 倍のオクターブ補正を用いる。
  */
 
 const TARGET_LOW_FREQUENCY = 140;
 const MAX_PLAYBACK_FREQUENCY = 3500;
 const OUTPUT_GAIN = 0.045;
+const PLAY_DURATION = 1.5;
 const SILENCE_THRESHOLD = 1e-7;
 
 export function createAudioController() {
   let context = null;
-  let oscillator = null;
-  let gainNode = null;
-  let enabled = false;
-  let mode = "source";
-  let currentParameters = null;
+  let currentOscillator = null;
+  let currentGain = null;
 
-  async function setEnabled(nextEnabled, parameters) {
-    enabled = nextEnabled;
-    currentParameters = parameters;
+  async function play(mode, parameters) {
+    stop();
 
-    if (!enabled) {
-      stopTone();
-      return getAudioInfo(parameters);
-    }
-
-    ensureAudioGraph();
+    ensureContext();
 
     if (context.state === "suspended") {
       await context.resume();
     }
 
-    startOrUpdateTone();
-    return getAudioInfo(parameters);
-  }
+    const info = calculateAudioInfo(parameters, mode);
 
-  function setMode(nextMode, parameters) {
-    mode = nextMode;
-    currentParameters = parameters;
+    const frequency =
+      mode === "source"
+        ? info.sourcePlaybackFrequency
+        : info.reconstructedPlaybackFrequency;
 
-    if (enabled) {
-      startOrUpdateTone();
+    if (!Number.isFinite(frequency) || frequency <= 0) {
+      return info;
     }
 
-    return getAudioInfo(parameters);
-  }
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
 
-  function update(parameters) {
-    currentParameters = parameters;
+    currentOscillator = oscillator;
+    currentGain = gain;
 
-    if (enabled) {
-      startOrUpdateTone();
-    }
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
 
-    return getAudioInfo(parameters);
+    const now = context.currentTime;
+    const fadeIn = 0.02;
+    const fadeOut = 0.06;
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(
+      OUTPUT_GAIN,
+      now + fadeIn
+    );
+    gain.gain.setValueAtTime(
+      OUTPUT_GAIN,
+      now + PLAY_DURATION - fadeOut
+    );
+    gain.gain.linearRampToValueAtTime(
+      0,
+      now + PLAY_DURATION
+    );
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+
+    oscillator.start(now);
+    oscillator.stop(now + PLAY_DURATION + 0.02);
+
+    oscillator.addEventListener(
+      "ended",
+      () => {
+        if (currentOscillator === oscillator) {
+          currentOscillator = null;
+          currentGain = null;
+        }
+      },
+      { once: true }
+    );
+
+    return info;
   }
 
   function stop() {
-    enabled = false;
-    stopTone();
-  }
+    if (!context || !currentOscillator) {
+      return;
+    }
 
-  function ensureAudioGraph() {
-    if (!context) {
-      const AudioContextClass =
-        window.AudioContext || window.webkitAudioContext;
+    const oscillator = currentOscillator;
+    const gain = currentGain;
+    const now = context.currentTime;
 
-      if (!AudioContextClass) {
-        throw new Error("このブラウザは Web Audio API に対応していません。");
+    try {
+      if (gain) {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setTargetAtTime(0, now, 0.01);
       }
 
-      context = new AudioContextClass();
-
-      gainNode = context.createGain();
-      gainNode.gain.value = 0;
-      gainNode.connect(context.destination);
+      oscillator.stop(now + 0.04);
+    } catch {
+      // すでに停止済みの場合は何もしない。
     }
 
-    if (!oscillator) {
-      oscillator = context.createOscillator();
-      oscillator.type = "sine";
-      oscillator.frequency.value = 440;
-      oscillator.connect(gainNode);
-      oscillator.start();
-    }
+    currentOscillator = null;
+    currentGain = null;
   }
 
-  function startOrUpdateTone() {
-    ensureAudioGraph();
-
-    const info = getAudioInfo(currentParameters);
-    const now = context.currentTime;
-
-    let frequency;
-
-    if (mode === "source") {
-      frequency = info.sourcePlaybackFrequency;
-    } else {
-      frequency = info.reconstructedPlaybackFrequency;
-    }
-
-    if (!Number.isFinite(frequency) || frequency <= 0) {
-      gainNode.gain.cancelScheduledValues(now);
-      gainNode.gain.setTargetAtTime(0, now, 0.015);
+  function ensureContext() {
+    if (context) {
       return;
     }
 
-    oscillator.frequency.cancelScheduledValues(now);
-    oscillator.frequency.setTargetAtTime(
-      frequency,
-      now,
-      0.01
-    );
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
 
-    gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setTargetAtTime(
-      OUTPUT_GAIN,
-      now,
-      0.02
-    );
-  }
-
-  function stopTone() {
-    if (!context || !gainNode) {
-      return;
+    if (!AudioContextClass) {
+      throw new Error(
+        "このブラウザは Web Audio API に対応していません。"
+      );
     }
 
-    const now = context.currentTime;
-    gainNode.gain.cancelScheduledValues(now);
-    gainNode.gain.setTargetAtTime(0, now, 0.015);
+    context = new AudioContextClass();
   }
 
   return {
-    setEnabled,
-    setMode,
-    update,
+    play,
     stop,
   };
-
-  function getAudioInfo(parameters) {
-    return calculateAudioInfo(parameters, mode);
-  }
 }
 
 export function calculateAudioInfo(
@@ -173,9 +154,7 @@ export function calculateAudioInfo(
     aliasFrequency < SILENCE_THRESHOLD ||
     sampleRms < SILENCE_THRESHOLD;
 
-  const audibleFrequencies = [
-    signalFrequency,
-  ];
+  const audibleFrequencies = [signalFrequency];
 
   if (!reconstructedIsSilent) {
     audibleFrequencies.push(aliasFrequency);
@@ -198,10 +177,9 @@ export function calculateAudioInfo(
 
   if (octaveMultiplier > 1) {
     note =
-      `聞き取りやすさのため、元音と復元音の両方を同じ倍率（×${octaveMultiplier}）で高く再生しています。`;
+      `聞き取りやすさのため、原音と復元音の両方を同じ倍率（×${octaveMultiplier}）で高く再生します。`;
   } else {
-    note =
-      "音程補正なしで再生しています。";
+    note = "音程補正なしで再生します。";
   }
 
   if (

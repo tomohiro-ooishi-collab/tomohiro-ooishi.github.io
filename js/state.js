@@ -8,9 +8,6 @@ const defaults = Object.freeze({
   amplitude: 1,
   phase: 0,
 
-  audioEnabled: false,
-  audioMode: "source",
-
   displayStart: 0,
   displayEnd: 0.02,
   pointCount: 801,
@@ -51,14 +48,6 @@ function validateState(candidate) {
 
   if (!Number.isFinite(candidate.phase)) {
     throw new Error("phase は有限値にしてください。");
-  }
-
-  if (typeof candidate.audioEnabled !== "boolean") {
-    throw new Error("audioEnabled は true / false で指定してください。");
-  }
-
-  if (!["source", "reconstructed"].includes(candidate.audioMode)) {
-    throw new Error("audioMode は source または reconstructed にしてください。");
   }
 
   if (
