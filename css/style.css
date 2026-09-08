@@ -434,3 +434,86 @@ canvas {
     transition: none !important;
   }
 }
+
+/* Step 4b: 音声ボタンを下側グラフの直下に配置 */
+.audio-actions {
+  padding: 18px 24px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.audio-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.audio-button {
+  min-width: 150px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 780;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease;
+}
+
+.audio-button:hover {
+  transform: translateY(-1px);
+}
+
+.audio-button:active {
+  transform: translateY(1px);
+}
+
+.audio-button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline-offset: 3px;
+}
+
+.source-audio-button {
+  border: 1px solid var(--accent);
+  color: white;
+  background: var(--accent);
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.18);
+}
+
+.source-audio-button:hover {
+  background: var(--accent-dark);
+}
+
+.reconstructed-audio-button {
+  border: 1px solid #d7a249;
+  color: #7a4700;
+  background: #fff7e8;
+}
+
+.reconstructed-audio-button:hover {
+  background: #ffefcf;
+}
+
+.audio-actions .audio-note {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 760px) {
+  .audio-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .audio-button {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 440px) {
+  .audio-buttons {
+    grid-template-columns: 1fr;
+  }
+}
